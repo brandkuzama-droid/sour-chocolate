@@ -193,19 +193,9 @@ const CONFIG = {
   defaultLang: "ar",            // اللغة الافتراضية: ar أو en أو ur
   requireFull: true,            // true = لازم يكمل العدد المسموح من كل فئة
   minDaysAhead: 1,              // أقرب تاريخ مسموح للطلب (بالأيام)
-  discount: 0,                  // نسبة الخصم %
-  coupon: "",                   // كوبون الخصم، ينطبق تلقائياً ("" = بدون اسم كوبون) على البكج والزيادات (0 = بدون خصم)
-
-  // picks = عدد الأصناف المسموحة من كل فئة، price = السعر قبل الخصم (null = ما يظهر)
-  // extra في الصنف = زيادة على سعر البكج قبل الخصم
-  sufras: [
-    { name: { ar: "بكج صغير", en: "Small Package", ur: "چھوٹا پیکج" },  min: 4,  max: 6,  picks: 1, price: 199 },
-    { name: { ar: "بكج وسط", en: "Medium Package", ur: "درمیانہ پیکج" }, min: 8,  max: 10, picks: 2, price: 349 },
-    { name: { ar: "بكج كبير", en: "Large Package", ur: "بڑا پیکج" },   min: 14, max: 18, picks: 3, price: 549 },
-    { name: { ar: "بكج المناسبات", en: "Party Package", ur: "تقریب پیکج" }, min: 20, max: 25, picks: 4, price: 799 },
-  ],
-
-  // الأصناف. img = رابط الصورة (صور قوقل درايف: https://drive.google.com/thumbnail?id=رقم_الملف&sz=w800 ، والملف لازم يكون مشارك للجميع)
+  discount: MENU_DISCOUNT,      // نسبة الخصم % (من menu.js، ويتغير من المحرر)
+  coupon: MENU_COUPON,          // كوبون الخصم (من menu.js، ويتغير من المحرر)
+  sufras: MENU_SUFRAS,          // البكجات (من menu.js، وتتغير من المحرر في شاشة الكاشير)
   categories: MENU_CATEGORIES   // الأصناف في ملف menu.js
 };
 /* ========================================================= */
@@ -323,6 +313,7 @@ $("langs").onclick = e => {
 
 function renderSufras(){
   const box = $("sufras"); box.innerHTML = "";
+  if (!ready) { const p = document.createElement("p"); p.className = "sub"; p.textContent = lang === "en" ? "Loading…" : lang === "ur" ? "لوڈ ہو رہا ہے…" : "جاري التحميل…"; box.appendChild(p); return; }
   CONFIG.sufras.forEach((s, i) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "sufra" + (sufra === i ? " on" : "");
@@ -561,20 +552,33 @@ $("form").addEventListener("submit", async e => {
   } finally { btn.disabled = false; btn.textContent = t("send"); }
 });
 
-// يجيب الأصناف الغير متوفرة من الشيت
+// يجيب من الشيت: الأصناف الغير متوفرة + إعدادات المحرر (البكجات، الأصناف، الخصم)
 let sheetV2 = false;   // true = كود الشيت الجديد (فيه عمود الحي)
+let ready = !CONFIG.sheetUrl;   // ما نعرض البكجات لين توصل الإعدادات (أو يمر وقت الانتظار)
+const fillNames = n => { const o = n || {}; const ar = String(o.ar || ""); return { ar, en: o.en || ar, ur: o.ur || ar }; };
+function applyRemote(cfg){
+  if (!cfg || !Array.isArray(cfg.sufras) || !Array.isArray(cfg.categories) || !cfg.sufras.length || !cfg.categories.length) return;
+  CONFIG.sufras = cfg.sufras.map(s => ({ ...s, name: fillNames(s.name) }));
+  CONFIG.categories = cfg.categories.map(c => ({ name: fillNames(c.name), items: (c.items || []).map(it => ({ ...it, ...fillNames(it) })) }));
+  CONFIG.discount = Number(cfg.discount) || 0;
+  CONFIG.coupon = String(cfg.coupon || "");
+  sufra = null; catIdx = 0; picks = newPicks();
+}
+function markReady(){ if (ready) return; ready = true; applyLang(); }
 async function loadAvailability(){
   if (!CONFIG.sheetUrl) return;
+  const wait = setTimeout(markReady, 6000);   // لو الشيت تأخر، نعرض القيم الافتراضية
   try {
     const res = await fetch(CONFIG.sheetUrl + "?action=menu&t=" + Date.now());
     const data = await res.json();
     if (!data.ok || !Array.isArray(data.off)) return;
     sheetV2 = true;
+    if (data.config && step === 1 && sufra == null) applyRemote(data.config);
     OFF = new Set(data.off);
     picks = trimPicks(Infinity);
     if (step === 2) renderCats();
     updateBar();
-  } catch {}
+  } catch {} finally { clearTimeout(wait); markReady(); if (ready) renderSufras(); }
 }
 
 applyLang(); go(1); loadAvailability();

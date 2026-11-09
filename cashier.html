@@ -93,6 +93,38 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
   background:var(--fg);color:#fff;border-radius:10px;padding:10px 16px;font-weight:600}
 @media (max-width:420px){.grid{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.card.fresh{animation:none}}
+
+/* ===== المحرر ===== */
+.switch{background:none;border:0;color:var(--accent);font-weight:700;padding:4px;text-decoration:underline;text-underline-offset:3px}
+.ed-top{position:sticky;top:0;z-index:5;background:var(--bg);padding-block:10px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.ed-top h1{margin:0;font-size:1.3rem;font-weight:800}
+.ed-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.dirty{font-size:.85rem;font-weight:700;color:var(--ready)}
+.ed-sec{display:flex;flex-direction:column;gap:12px}
+.ed-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ed-card-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.ed-card-h h2{margin:0;font-size:1.05rem;font-weight:800}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld span{font-size:.8rem;color:var(--muted);font-weight:600}
+.fld input{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:9px;width:100%;background:var(--surface);color:var(--fg);min-width:0}
+.fld input[dir="ltr"]{text-align:left}
+.mini{display:flex;flex-wrap:wrap;gap:6px}
+.mini button,.addbtn{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-weight:700;color:var(--fg);font-size:.85rem}
+.mini button.del{color:var(--cancel);border-color:#E9C4C4}
+.mini button:disabled{opacity:.4;cursor:default}
+.addbtn{border-style:dashed;color:var(--accent);padding:10px;width:100%}
+.ed-items{display:flex;flex-direction:column;gap:10px}
+.ed-item{display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg)}
+.thumb{width:84px;height:84px;border-radius:10px;background:var(--soft);display:grid;place-items:center;overflow:hidden;color:var(--accent);font-weight:800;font-size:1.6rem}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.ed-item .body{display:flex;flex-direction:column;gap:8px;min-width:0}
+.imgrow{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}
+.imgrow .fld{flex:1;min-width:160px}
+.upl{position:relative;overflow:hidden}
+.upl input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.note{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:.9rem;color:var(--fg);margin:0}
+@media (max-width:520px){.ed-item{grid-template-columns:1fr}.thumb{width:100%;height:140px}}
 </style>
 </head>
 <body>
@@ -106,7 +138,41 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
     <input id="key" type="password" autocomplete="current-password" placeholder="كلمة السر" required>
     <p class="err" id="loginErr" hidden></p>
     <button class="btn" type="submit" id="loginBtn">دخول</button>
+    <button class="switch" type="button" id="toEditor">دخول المحرر ←</button>
   </form>
+
+  <!-- دخول المحرر -->
+  <form class="login" id="edLogin" hidden>
+    <h1>دخول المحرر</h1>
+    <p class="muted">لتعديل البكجات والأصناف والصور والخصم</p>
+    <label for="edEmail" hidden>الإيميل</label>
+    <input id="edEmail" type="email" autocomplete="username" placeholder="الإيميل" dir="ltr" required>
+    <label for="edPass" hidden>كلمة السر</label>
+    <input id="edPass" type="password" autocomplete="current-password" placeholder="كلمة السر" required>
+    <p class="err" id="edErr" hidden></p>
+    <button class="btn" type="submit" id="edBtn">دخول</button>
+    <button class="switch" type="button" id="toCashier">→ رجوع لشاشة الكاشير</button>
+  </form>
+
+  <!-- المحرر -->
+  <main id="editor" hidden>
+    <div class="ed-top">
+      <div><h1>محرر سور شوكلت</h1><p class="muted" id="edWho"></p></div>
+      <div class="ed-acts">
+        <span class="dirty" id="dirty" hidden>● تغييرات ما انحفظت</span>
+        <button class="btn" type="button" id="edSave">حفظ ونشر</button>
+        <button class="ghost" type="button" id="edOut">خروج</button>
+      </div>
+    </div>
+    <div class="views" id="edViews" role="group" aria-label="قسم المحرر">
+      <button type="button" data-v="sufras" aria-pressed="true">البكجات</button>
+      <button type="button" data-v="cats" aria-pressed="false">الأصناف</button>
+      <button type="button" data-v="disc" aria-pressed="false">الخصم</button>
+    </div>
+    <section class="ed-sec" id="edSufras"></section>
+    <section class="ed-sec" id="edCats" hidden></section>
+    <section class="ed-sec" id="edDisc" hidden></section>
+  </main>
 
   <!-- اللوحة -->
   <main id="board" hidden>
@@ -156,6 +222,7 @@ const TABS = [
 ];
 
 let OFF = new Set(), view = "orders", savingAvail = false, availVer = 0;
+let CATS = typeof MENU_CATEGORIES !== "undefined" ? MENU_CATEGORIES : null;   // تتحدث من إعدادات المحرر
 let alarm = null, key = "", orders = [], seen = null, tab = "new", soundOn = true, timer = null, busy = {};
 try { key = localStorage.getItem("cashierKey") || ""; soundOn = localStorage.getItem("cashierSound") !== "off"; } catch {}
 
@@ -240,6 +307,7 @@ async function load(){
   const res = await fetch(SHEET_URL + "?key=" + encodeURIComponent(key) + "&t=" + Date.now());
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "fail");
+  if (data.config && Array.isArray(data.config.categories)) CATS = data.config.categories;
   if (Array.isArray(data.off) && !savingAvail && v === availVer) {
     const next = new Set(data.off);
     const same = next.size === OFF.size && [...next].every(x => OFF.has(x));
@@ -399,8 +467,8 @@ $("testSound").onclick = () => {
 // ===== الأصناف المتوفرة =====
 function renderMenu(){
   const box = $("menuList"); box.innerHTML = "";
-  if (typeof MENU_CATEGORIES === "undefined") { box.appendChild(el("div", "empty", "ما قدرنا نحمّل قائمة الأصناف.")); return; }
-  MENU_CATEGORIES.forEach(c => {
+  if (!CATS) { box.appendChild(el("div", "empty", "ما قدرنا نحمّل قائمة الأصناف.")); return; }
+  CATS.forEach(c => {
     const sec = el("section", "mcat");
     const h = el("div", "mcat-h"); const offN = c.items.filter(it => OFF.has(it.ar)).length;
     h.append(el("h2", null, c.name.ar), el("span", "muted", offN ? `${offN} غير متوفر` : "كلها متوفرة"));
@@ -451,6 +519,248 @@ setInterval(() => { if (!$("board").hidden) render(); }, 60000);
 // المتصفح ما يشغّل الصوت إلا بعد أول ضغطة في الصفحة
 document.addEventListener("pointerdown", () => { try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); } catch {} }, { once: true });
 if (key && SHEET_URL) start();
+
+// ===================== المحرر =====================
+let edToken = "", edEmail = "", cfg = null, edView = "sufras", edDirty = false, edSaving = false;
+try { edToken = sessionStorage.getItem("edToken") || ""; edEmail = sessionStorage.getItem("edEmail") || ""; } catch {}
+
+const clone = o => JSON.parse(JSON.stringify(o));
+const defaults = () => ({
+  sufras: clone(typeof MENU_SUFRAS !== "undefined" ? MENU_SUFRAS : []),
+  categories: clone(typeof MENU_CATEGORIES !== "undefined" ? MENU_CATEGORIES : []),
+  discount: typeof MENU_DISCOUNT !== "undefined" ? MENU_DISCOUNT : 0,
+  coupon: typeof MENU_COUPON !== "undefined" ? MENU_COUPON : ""
+});
+async function post(body){
+  const res = await fetch(SHEET_URL, { method: "POST", body: JSON.stringify(body) });
+  return res.json();
+}
+function setDirty(v){ edDirty = v; $("dirty").hidden = !v; }
+window.addEventListener("beforeunload", e => { if (edDirty) { e.preventDefault(); e.returnValue = ""; } });
+
+// يحوّل رابط مشاركة قوقل درايف لرابط صورة يشتغل في الصفحة
+function fixImg(u){
+  u = String(u || "").trim(); if (!u) return "";
+  const m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800` : u;
+}
+
+function fld(label, val, onInput, opts = {}){
+  const w = el("label", "fld"); const inp = document.createElement("input");
+  inp.type = opts.type || "text"; inp.value = val == null ? "" : val;
+  if (opts.ltr) inp.dir = "ltr"; if (opts.min != null) inp.min = opts.min; if (opts.step) inp.step = opts.step;
+  if (opts.ph) inp.placeholder = opts.ph; if (opts.type === "number") inp.inputMode = "decimal";
+  inp.oninput = () => { onInput(opts.type === "number" ? (inp.value === "" ? "" : Number(inp.value)) : inp.value, inp); setDirty(true); };
+  w.append(el("span", null, label), inp); return w;
+}
+function miniBtns(list, i, rerender, delLabel){
+  const box = el("div", "mini");
+  const up = el("button", null, "↑ فوق"), dn = el("button", null, "↓ تحت"), del = el("button", "del", delLabel || "حذف");
+  [up, dn, del].forEach(b => b.type = "button");
+  up.disabled = i === 0; dn.disabled = i === list.length - 1;
+  up.onclick = () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; setDirty(true); rerender(); };
+  dn.onclick = () => { [list[i + 1], list[i]] = [list[i], list[i + 1]]; setDirty(true); rerender(); };
+  del.onclick = () => {
+    if (!del.dataset.sure) { del.dataset.sure = "1"; del.textContent = "متأكد؟"; setTimeout(() => { if (del.isConnected) { delete del.dataset.sure; del.textContent = delLabel || "حذف"; } }, 3000); return; }
+    list.splice(i, 1); setDirty(true); rerender();
+  };
+  box.append(up, dn, del); return box;
+}
+function nameFields(obj, title){
+  obj.name = obj.name || { ar: "", en: "", ur: "" };
+  const f = el("div", "fields");
+  f.append(
+    fld(title + " (عربي)", obj.name.ar, v => obj.name.ar = v),
+    fld("English", obj.name.en, v => obj.name.en = v, { ltr: true }),
+    fld("اردو", obj.name.ur, v => obj.name.ur = v)
+  );
+  return f;
+}
+
+function renderSufrasEd(){
+  const box = $("edSufras"); box.innerHTML = "";
+  box.append(el("p", "note", "كل بكج: كم شخص يكفي، كم صنف يختار العميل من كل فئة، وسعره قبل الخصم."));
+  cfg.sufras.forEach((s, i) => {
+    const c = el("div", "ed-card");
+    const h = el("div", "ed-card-h"); h.append(el("h2", null, s.name.ar || `بكج ${i + 1}`), miniBtns(cfg.sufras, i, renderSufrasEd));
+    const nums = el("div", "fields");
+    nums.append(
+      fld("يكفي من (أشخاص)", s.min, v => s.min = v, { type: "number", min: 1 }),
+      fld("إلى (أشخاص)", s.max, v => s.max = v, { type: "number", min: 1 }),
+      fld("أصناف من كل فئة", s.picks, v => s.picks = v, { type: "number", min: 1 }),
+      fld("السعر (ريال)", s.price, v => s.price = v, { type: "number", min: 0, step: "any" })
+    );
+    const names = nameFields(s, "اسم البكج");
+    names.querySelector("input").addEventListener("input", e => h.querySelector("h2").textContent = e.target.value || `بكج ${i + 1}`);
+    c.append(h, names, nums); box.append(c);
+  });
+  const add = el("button", "addbtn", "+ إضافة بكج"); add.type = "button";
+  add.onclick = () => { cfg.sufras.push({ name: { ar: "", en: "", ur: "" }, min: 1, max: 2, picks: 1, price: 0 }); setDirty(true); renderSufrasEd(); };
+  box.append(add);
+}
+
+function thumbOf(it){
+  const t = el("div", "thumb");
+  if (it.img) { const im = document.createElement("img"); im.alt = ""; im.src = it.img; im.onerror = () => { t.textContent = "؟"; }; t.append(im); }
+  else t.textContent = (it.ar || "؟").trim()[0] || "؟";
+  return t;
+}
+async function shrink(file){
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement("canvas"); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+  cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+async function uploadFor(it, btn, rerender){
+  const inp = btn.querySelector("input"); const file = inp.files && inp.files[0]; if (!file) return;
+  const lbl = btn.querySelector("b"); lbl.textContent = "جاري الرفع…"; btn.style.pointerEvents = "none";
+  try {
+    const data = await shrink(file);
+    const r = await post({ action: "uploadImage", token: edToken, name: it.ar || file.name, mime: "image/jpeg", data });
+    if (r.error === "auth") return edExpired();
+    if (!r.ok) throw new Error(r.error);
+    it.img = r.url; setDirty(true); rerender(); toast("انرفعت الصورة ✓ (لا تنسى حفظ ونشر)");
+  } catch { toast("ما قدرنا نرفع الصورة، جرّب مرة ثانية"); lbl.textContent = "📷 رفع صورة"; btn.style.pointerEvents = ""; }
+}
+
+function renderCatsEd(){
+  const box = $("edCats"); box.innerHTML = "";
+  box.append(el("p", "note", "الزيادة = مبلغ يضاف على سعر البكج إذا اختار العميل هالصنف (اتركها فاضية لو ما فيه). الصورة: ارفعها من جهازك أو الصق رابط."));
+  cfg.categories.forEach((c, ci) => {
+    const card = el("div", "ed-card");
+    const h = el("div", "ed-card-h"); h.append(el("h2", null, c.name.ar || `فئة ${ci + 1}`), miniBtns(cfg.categories, ci, renderCatsEd, "حذف الفئة"));
+    const names = nameFields(c, "اسم الفئة");
+    names.querySelector("input").addEventListener("input", e => h.querySelector("h2").textContent = e.target.value || `فئة ${ci + 1}`);
+    const list = el("div", "ed-items");
+    c.items = c.items || [];
+    c.items.forEach((it, ii) => {
+      const row = el("div", "ed-item"); const body = el("div", "body");
+      const th = thumbOf(it);
+      const f = el("div", "fields");
+      f.append(
+        fld("الصنف (عربي)", it.ar, v => { it.ar = v; if (!it.img) th.textContent = (v || "؟").trim()[0] || "؟"; }),
+        fld("English", it.en, v => it.en = v, { ltr: true }),
+        fld("اردو", it.ur, v => it.ur = v),
+        fld("زيادة (ريال)", it.extra || "", v => { if (v === "" || !v) delete it.extra; else it.extra = v; }, { type: "number", min: 0, step: "any", ph: "0" })
+      );
+      const ir = el("div", "imgrow");
+      const urlF = fld("رابط الصورة", it.img || "", (v, inp) => { it.img = fixImg(v); }, { ltr: true, ph: "https://…" });
+      urlF.querySelector("input").onchange = () => { renderCatsEd(); };
+      const up = el("label", "mini upl"); const ub = el("button", null); ub.type = "button"; ub.tabIndex = -1;
+      const b = el("b", null, "📷 رفع صورة"); ub.append(b);
+      const fi = document.createElement("input"); fi.type = "file"; fi.accept = "image/*";
+      fi.onchange = () => uploadFor(it, up, renderCatsEd);
+      up.append(ub, fi); up.querySelector("b") || null;
+      const rm = el("button", null, "إزالة الصورة"); rm.type = "button"; rm.hidden = !it.img;
+      rm.onclick = () => { it.img = ""; setDirty(true); renderCatsEd(); };
+      const ctl = el("div", "mini"); ctl.append(up, rm);
+      ir.append(urlF, ctl);
+      body.append(f, ir, miniBtns(c.items, ii, renderCatsEd));
+      row.append(th, body); list.append(row);
+    });
+    const addI = el("button", "addbtn", "+ إضافة صنف"); addI.type = "button";
+    addI.onclick = () => { c.items.push({ ar: "", en: "", ur: "", img: "" }); setDirty(true); renderCatsEd(); };
+    card.append(h, names, list, addI); box.append(card);
+  });
+  const addC = el("button", "addbtn", "+ إضافة فئة"); addC.type = "button";
+  addC.onclick = () => { cfg.categories.push({ name: { ar: "", en: "", ur: "" }, items: [{ ar: "", en: "", ur: "", img: "" }] }); setDirty(true); renderCatsEd(); };
+  box.append(addC);
+}
+
+function renderDiscEd(){
+  const box = $("edDisc"); box.innerHTML = "";
+  const c = el("div", "ed-card");
+  const f = el("div", "fields");
+  f.append(
+    fld("نسبة الخصم %", cfg.discount || "", v => cfg.discount = v === "" ? 0 : v, { type: "number", min: 0, ph: "0 = بدون خصم" }),
+    fld("اسم الكوبون (اختياري)", cfg.coupon || "", v => cfg.coupon = v.trim(), { ltr: true, ph: "مثل SOUR10" })
+  );
+  c.append(el("h2", null, "الخصم"), el("p", "muted", "الخصم ينطبق تلقائياً على البكج والزيادات. اسم الكوبون يطلع للعميل بس للعرض، وما يحتاج يكتبه."), f);
+  box.append(c);
+}
+
+function renderEditor(){
+  $("edSufras").hidden = edView !== "sufras"; $("edCats").hidden = edView !== "cats"; $("edDisc").hidden = edView !== "disc";
+  document.querySelectorAll("#edViews button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === edView)));
+  if (edView === "sufras") renderSufrasEd(); else if (edView === "cats") renderCatsEd(); else renderDiscEd();
+}
+$("edViews").onclick = e => { const b = e.target.closest("button[data-v]"); if (!b) return; edView = b.dataset.v; renderEditor(); window.scrollTo(0, 0); };
+
+function validate(){
+  if (!cfg.sufras.length) return "لازم بكج واحد على الأقل.";
+  for (const [i, s] of cfg.sufras.entries()) {
+    if (!String(s.name.ar || "").trim()) return `البكج رقم ${i + 1} بدون اسم عربي.`;
+    if (!(s.picks >= 1)) return `البكج "${s.name.ar}": عدد الأصناف لازم 1 أو أكثر.`;
+    if (!(s.min >= 1) || !(s.max >= s.min)) return `البكج "${s.name.ar}": عدد الأشخاص غلط (من لازم أقل من إلى).`;
+    if (s.price === "" || !(s.price >= 0)) return `البكج "${s.name.ar}": اكتب السعر.`;
+  }
+  const cats = cfg.categories.filter(c => (c.items || []).some(it => String(it.ar || "").trim()));
+  if (!cats.length) return "لازم فئة فيها صنف واحد على الأقل.";
+  for (const c of cfg.categories) {
+    if (!String(c.name.ar || "").trim() && (c.items || []).some(it => String(it.ar || "").trim())) return "فيه فئة بدون اسم عربي.";
+  }
+  return "";
+}
+$("edSave").onclick = async () => {
+  if (edSaving) return;
+  const err = validate(); if (err) return toast(err);
+  edSaving = true; const b = $("edSave"); b.disabled = true; b.textContent = "جاري الحفظ…";
+  try {
+    const r = await post({ action: "saveConfig", token: edToken, config: cfg });
+    if (r.error === "auth") return edExpired();
+    if (!r.ok) throw new Error(r.error);
+    cfg = r.config; CATS = cfg.categories; setDirty(false); renderEditor();
+    toast("انحفظ ✓ التغييرات طالعة للعملاء الحين");
+  } catch (x) { toast(x.message === "too_big" ? "الإعدادات كبيرة مرة، قلّل الأصناف أو الأسماء" : "ما قدرنا نحفظ، تأكد من الإنترنت وجرّب مرة ثانية"); }
+  finally { edSaving = false; b.disabled = false; b.textContent = "حفظ ونشر"; }
+};
+
+async function openEditor(){
+  $("login").hidden = true; $("edLogin").hidden = true; $("board").hidden = true; $("editor").hidden = false;
+  $("edWho").textContent = edEmail ? "داخل باسم " + edEmail : "";
+  $("edSufras").innerHTML = ""; $("edSufras").append(el("p", "muted", "جاري تحميل الإعدادات…"));
+  try {
+    const res = await fetch(SHEET_URL + "?action=menu&t=" + Date.now()); const data = await res.json();
+    cfg = data.config ? clone(data.config) : defaults();
+  } catch { cfg = defaults(); toast("ما قدرنا نجيب الإعدادات من الشيت، معروضة القيم الافتراضية"); }
+  setDirty(false); renderEditor();
+}
+function edLogout(){
+  if (edDirty && !confirm("فيه تغييرات ما انحفظت. تبي تطلع؟")) return;
+  edToken = ""; edEmail = ""; setDirty(false);
+  try { sessionStorage.removeItem("edToken"); sessionStorage.removeItem("edEmail"); } catch {}
+  $("editor").hidden = true; $("edLogin").hidden = false;
+}
+function edExpired(){
+  edToken = ""; try { sessionStorage.removeItem("edToken"); } catch {}
+  toast("انتهت جلسة المحرر، ادخل مرة ثانية (تغييراتك باقية في الصفحة)");
+  $("editor").hidden = true; $("edLogin").hidden = false; $("edErr").hidden = true;
+  $("edLogin").dataset.resume = "1";
+}
+$("edOut").onclick = edLogout;
+$("toEditor").onclick = () => { $("login").hidden = true; $("edLogin").hidden = false; $("edEmail").focus(); };
+$("toCashier").onclick = () => { $("edLogin").hidden = true; $("login").hidden = false; };
+$("edLogin").addEventListener("submit", async e => {
+  e.preventDefault();
+  const err = $("edErr"); err.hidden = true;
+  if (!SHEET_URL) { err.textContent = "ما انحط رابط Apps Script في الملف للحين."; err.hidden = false; return; }
+  $("edBtn").disabled = true;
+  try {
+    const r = await post({ action: "editorLogin", email: $("edEmail").value.trim(), password: $("edPass").value });
+    if (!r.ok) {
+      err.textContent = r.error === "locked" ? "محاولات كثيرة غلط. انتظر ربع ساعة وجرّب." :
+        r.error === "editor_off" ? "دخول المحرر مو مفعّل. حط إيميل وكلمة سر المحرر في كود Apps Script." : "الإيميل أو كلمة السر غلط.";
+      err.hidden = false; return;
+    }
+    edToken = r.token; edEmail = r.email; $("edPass").value = "";
+    try { sessionStorage.setItem("edToken", edToken); sessionStorage.setItem("edEmail", edEmail); } catch {}
+    if ($("edLogin").dataset.resume && cfg) { delete $("edLogin").dataset.resume; $("edLogin").hidden = true; $("editor").hidden = false; $("edWho").textContent = "داخل باسم " + edEmail; return; }
+    openEditor();
+  } catch { err.textContent = "ما قدرنا نتصل، تأكد من الإنترنت."; err.hidden = false; }
+  finally { $("edBtn").disabled = false; }
+});
+if (edToken && SHEET_URL && !key) openEditor();
 </script>
 </body>
 </html>
