@@ -1,0 +1,130 @@
+/* =========================================================
+   كود Google Sheet لطلبات سور شوكلت
+   الصقه في: الشيت ← الإضافات ← Apps Script
+   ========================================================= */
+
+// كلمة سر شاشة الكاشير — غيّرها لكلمة خاصة فيك، ونفسها تكتبها في شاشة الكاشير
+const SECRET = "CHANGE-ME-1234";
+
+// إيميل تنبيه لكل طلب جديد: يوصل إشعار للجوال حتى لو شاشة الكاشير مسكرة
+// تقدر تحط أكثر من إيميل بينها فاصلة، مثل: "a@gmail.com, b@gmail.com" (فاضي = بدون إيميل)
+const NOTIFY_EMAILS = "brand.kuzama@gmail.com";
+
+const SHEET_NAME = "الطلبات";
+const HEADERS = ["رقم الطلب", "وقت الطلب", "الحالة", "البكج", "الأصناف", "الإجمالي",
+                 "الاسم", "الجوال", "طريقة التواصل", "تاريخ الاستلام", "ملاحظات", "لغة العميل", "الحي", "العنوان الوطني", "رابط الموقع"];
+const STATUSES = ["جديد", "مؤكد", "جاهز", "تم التسليم", "ملغي"];
+
+function sheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_NAME);
+    sh.appendRow(HEADERS);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, HEADERS.length).setFontWeight("bold");
+    sh.setRightToLeft(true);
+  }
+  if (sh.getLastColumn() < HEADERS.length) {   // يضيف الأعمدة الجديدة لشيت قديم
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight("bold");
+  }
+  return sh;
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function clean_(v, max) {
+  return String(v == null ? "" : v).slice(0, max || 500).replace(/^[=+\-@]/, "'$&"); // يمنع تنفيذ معادلات
+}
+
+// استقبال طلب جديد، أو تغيير حالة طلب من الكاشير
+function doPost(e) {
+  let d;
+  try { d = JSON.parse(e.postData.contents); } catch (x) { return json_({ ok: false, error: "bad_json" }); }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (d.action === "avail") {   // الكاشير يحدّث الأصناف الغير متوفرة
+      if (d.key !== SECRET) return json_({ ok: false, error: "key" });
+      const off = (Array.isArray(d.off) ? d.off : []).map(x => String(x).slice(0, 100)).slice(0, 300);
+      PropertiesService.getScriptProperties().setProperty("off", JSON.stringify(off));
+      return json_({ ok: true, off: off });
+    }
+
+    const sh = sheet_();
+
+    if (d.action === "status") {
+      if (d.key !== SECRET) return json_({ ok: false, error: "key" });
+      if (STATUSES.indexOf(d.status) < 0) return json_({ ok: false, error: "status" });
+      const last = sh.getLastRow();
+      if (last < 2) return json_({ ok: false, error: "not_found" });
+      const ids = sh.getRange(2, 1, last - 1, 1).getValues().map(r => String(r[0]));
+      const i = ids.indexOf(String(d.id));
+      if (i < 0) return json_({ ok: false, error: "not_found" });
+      sh.getRange(i + 2, 3).setValue(d.status);
+      return json_({ ok: true });
+    }
+
+    const o = d.order || {};
+    if (!o.name || !o.phone || !o.sufra) return json_({ ok: false, error: "missing" });
+    sh.appendRow([
+      clean_(o.id, 20), new Date(), "جديد",
+      clean_(o.sufra), clean_(o.items, 3000), clean_(o.total, 200),
+      clean_(o.name, 120), "'" + String(o.phone).replace(/[^0-9+\s]/g, "").slice(0, 20), clean_(o.contact, 20),
+      clean_(o.date, 20), clean_(o.notes, 1000), clean_(o.lang, 20), clean_(o.district, 100),
+      clean_(o.naddr, 40), /^https:\/\/\S+$/i.test(String(o.maplink || "")) ? String(o.maplink).slice(0, 500) : ""
+    ]);
+    try { notify_(o); } catch (x) {}   // فشل التنبيه ما يوقف حفظ الطلب
+    return json_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function notify_(o) {
+  if (!NOTIFY_EMAILS) return;
+  const rows = [
+    ["رقم الطلب", "#" + o.id], ["تاريخ الاستلام", o.date], ["البكج", o.sufra],
+    ["الأصناف", String(o.items || "").replace(/\n/g, "<br>")], ["الإجمالي", o.total],
+    ["الاسم", o.name], ["الجوال", o.phone], ["الحي", o.district || "-"], ["العنوان الوطني", o.naddr || "-"], ["رابط الموقع", o.maplink || "-"], ["طريقة التواصل", o.contact],
+    ["ملاحظات", o.notes || "-"], ["لغة العميل", o.lang || "-"]
+  ];
+  const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const html = '<div dir="rtl" style="font-family:Tahoma,Arial;font-size:15px">' +
+    '<h2 style="color:#4A2C1D;margin:0 0 12px">طلب سور شوكلت جديد #' + esc(o.id) + '</h2>' +
+    '<table cellpadding="8" style="border-collapse:collapse">' +
+    rows.map(r => '<tr><td style="color:#7A6666;border-bottom:1px solid #eee;white-space:nowrap">' + r[0] +
+      '</td><td style="border-bottom:1px solid #eee">' + (r[0] === "الأصناف" ? esc(r[1]).replace(/&lt;br&gt;/g, "<br>") : esc(r[1])) + '</td></tr>').join("") +
+    '</table></div>';
+  MailApp.sendEmail({
+    to: NOTIFY_EMAILS,
+    subject: "🔔 طلب سور شوكلت جديد #" + o.id + " - " + o.name,
+    htmlBody: html, name: "طلبات سور شوكلت"
+  });
+}
+
+// شاشة الكاشير تقرأ آخر الطلبات (تحتاج كلمة السر)
+function off_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty("off") || "[]"); } catch (x) { return []; }
+}
+
+function doGet(e) {
+  // صفحة الطلب تقرأ الأصناف الغير متوفرة (بدون كلمة سر، ما فيها بيانات عملاء)
+  if (e.parameter.action === "menu") return json_({ ok: true, off: off_() });
+  if ((e.parameter.key || "") !== SECRET) return json_({ ok: false, error: "key" });
+  const v = sheet_().getDataRange().getValues();
+  v.shift();
+  const tz = "Asia/Riyadh";
+  const fmtDate = x => x instanceof Date ? Utilities.formatDate(x, tz, "yyyy-MM-dd") : String(x);
+  const orders = v.slice(-300).map(r => ({
+    id: String(r[0]),
+    time: r[1] instanceof Date ? r[1].toISOString() : String(r[1]),
+    status: r[2], sufra: r[3], items: r[4], total: r[5],
+    name: r[6], phone: String(r[7]), contact: r[8],
+    date: fmtDate(r[9]), notes: r[10], lang: r[11], district: r[12] || "", naddr: r[13] || "", maplink: r[14] || ""
+  })).reverse();
+  return json_({ ok: true, orders: orders, off: off_() });
+}
